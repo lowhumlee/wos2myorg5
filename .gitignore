@@ -1,0 +1,12 @@
+# Secrets — never commit API keys
+.streamlit/secrets.toml
+config_local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.db
+
+# Streamlit cache
+.streamlit/cache/
