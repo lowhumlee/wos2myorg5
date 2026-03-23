@@ -1,0 +1,26 @@
+{
+  "muv_affiliation_patterns": [
+    "medical university varna",
+    "med univ varna",
+    "mu varna",
+    "medical university of varna",
+    "med univ prof dr paraskev stoyanov varna",
+    "med univ prof dr paraskev stoyanov",
+    "varna med univ",
+    "paraskev stoyanov varna",
+    "муварна",
+    "медицинскиуниверситетварна",
+    "muv varna",
+    "med univ prof paraskev stoyanov varna",
+    "med univ prof paraskev stoyanov",
+    "paraskev stoyanov"
+  ],
+  "fuzzy_threshold": 0.85,
+  "interactive_mode": true,
+  "allow_multi_org": true,
+  "output_dir": "output",
+  "db_path": "staging.db",
+  "initial_expansion_enabled": true,
+  "initial_expansion_auto_confirm": false,
+  "sibling_grouping_enabled": true
+}
