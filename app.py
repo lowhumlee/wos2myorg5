@@ -480,8 +480,60 @@ with tab_review:
                                   key=_safe_key("cand", cname), disabled=decided)
                 dec["_cand_choice"] = ch
 
+                # ── Roster search (always visible under fuzzy suggestions) ──
+                fsk = _safe_key("fsearch", cname); fpk = _safe_key("fpick", cname)
+                NL  = "➕ Create as NEW PERSON"
+                fpq = dec.get("_fsearch", "")
+                fsq = st.text_input("🔍 Not satisfied? Search full roster",
+                                    value=fpq, key=fsk, disabled=decided,
+                                    placeholder="Type surname and press Enter…")
+                if fsq != fpq:
+                    dec["_fsearch"] = fsq
+                    dec["_fsearch_choice"] = ""
+                    st.session_state.pop(fpk, None)
+
+                fhits = []
+                if fsq and len(fsq) >= 2:
+                    q = normalize_name(fsq)
+                    for p in person_index:
+                        score = name_similarity(q, p["NormName"])
+                        if any(part in p["NormName"] for part in q.split() if len(part) > 2):
+                            score = max(score, 0.45)
+                        if score >= 0.28:
+                            fhits.append((score, p))
+                    fhits.sort(key=lambda x: -x[0])
+                    fhits = fhits[:8]
+
+                if fsq and len(fsq) >= 2:
+                    st.caption(f"🔍 {len(fhits)} match{'es' if len(fhits)!=1 else ''}" if fhits else "No matches")
+
+                if fhits:
+                    fopts  = ["— use suggestion above —"] + [
+                        f"[{p['PersonID']}] {p['AuthorFullName']}  ·  {int(s*100)}%"
+                        for s, p in fhits]
+                    fhm    = {f"[{p['PersonID']}] {p['AuthorFullName']}  ·  {int(s*100)}%": p
+                              for s, p in fhits}
+                    fss    = dec.get("_fsearch_choice", fopts[0])
+                    fsd    = fopts.index(fss) if fss in fopts else 0
+                    fsch   = st.selectbox("Select from search results", fopts,
+                                          index=fsd, key=fpk, disabled=decided)
+                    dec["_fsearch_choice"] = fsch
+                else:
+                    fsch = ""
+
+                # Determine final resolution: search result overrides suggestion
                 if not dec.get("_override_pid"):
-                    if "NEW PERSON" in ch:
+                    if fsch and fsch != "— use suggestion above —" and fsch in (fhm if fhits else {}):
+                        # User picked from their own search
+                        p = fhm[fsch]
+                        dec.update({
+                            "resolved_pid":  p["PersonID"],
+                            "resolved_name": p["AuthorFullName"],
+                            "match_type":    "resolved",
+                            "org_ids":       p.get("OrganizationIDs") or
+                                             ([p["OrganizationID"]] if p.get("OrganizationID") else [""]),
+                        })
+                    elif "NEW PERSON" in ch:
                         if (dec.get("match_type") != "new" or
                                 not isinstance(dec.get("resolved_pid"), str) or
                                 not dec.get("resolved_pid","").isdigit() or
