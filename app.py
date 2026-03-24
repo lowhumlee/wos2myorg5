@@ -119,6 +119,41 @@ def _safe_key(*parts):
     safe = re.sub(r"[^a-z0-9]", "_", raw.lower())
     return re.sub(r"_+", "_", safe).strip("_")
 
+def roster_search(query: str, person_index: list, top_n: int = 10) -> list:
+    """Token-coverage search: works for last, first, first+last, PID, or any order.
+    Returns list of (score, person_dict) sorted descending."""
+    from difflib import SequenceMatcher
+
+    q = query.strip()
+    if not q:
+        return []
+
+    # PID lookup — instant exact match
+    if q.isdigit():
+        pid = q
+        return [(1.0, p) for p in person_index if str(p.get("PersonID","")) == pid]
+
+    qn = normalize_name(q)
+    qtoks = [t for t in qn.split() if len(t) > 1]
+    if not qtoks:
+        return []
+
+    results = []
+    for p in person_index:
+        stoks = p["NormName"].split()
+        tok_scores = []
+        for qt in qtoks:
+            best = max((SequenceMatcher(None, qt, st).ratio() for st in stoks), default=0.0)
+            tok_scores.append(best)
+        coverage = sum(1 for s in tok_scores if s >= 0.85) / len(qtoks)
+        avg      = sum(tok_scores) / len(qtoks)
+        score    = 0.7 * coverage + 0.3 * avg
+        if score >= 0.30:
+            results.append((score, p))
+
+    results.sort(key=lambda x: -x[0])
+    return results[:top_n]
+
 def org_label(oid, org_map):
     for lbl, v in org_map.items():
         if v == oid:
@@ -493,18 +528,8 @@ with tab_review:
                     st.session_state.pop(fpk, None)
 
                 fhits = []
-                if fsq and len(fsq) >= 2:
-                    q = normalize_name(fsq)
-                    for p in person_index:
-                        score = name_similarity(q, p["NormName"])
-                        if any(part in p["NormName"] for part in q.split() if len(part) > 2):
-                            score = max(score, 0.45)
-                        if score >= 0.28:
-                            fhits.append((score, p))
-                    fhits.sort(key=lambda x: -x[0])
-                    fhits = fhits[:8]
-
-                if fsq and len(fsq) >= 2:
+                if fsq and len(fsq) >= 1:
+                    fhits = roster_search(fsq, person_index, top_n=10)
                     st.caption(f"🔍 {len(fhits)} match{'es' if len(fhits)!=1 else ''}" if fhits else "No matches")
 
                 if fhits:
@@ -563,16 +588,8 @@ with tab_review:
                     st.session_state.pop(pk, None)
 
                 hits = []
-                if sq and len(sq) >= 2:
-                    q = normalize_name(sq)
-                    for p in person_index:
-                        score = name_similarity(q, p["NormName"])
-                        if any(part in p["NormName"] for part in q.split() if len(part) > 2):
-                            score = max(score, 0.45)
-                        if score >= 0.28:
-                            hits.append((score, p))
-                    hits.sort(key=lambda x: -x[0])
-                    hits = hits[:8]
+                if sq and len(sq) >= 1:
+                    hits = roster_search(sq, person_index, top_n=10)
 
                 opts = [NL] + [f"[{p['PersonID']}] {p['AuthorFullName']}  ·  {int(s*100)}%"
                                for s, p in hits]
